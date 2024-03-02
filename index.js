@@ -229,6 +229,28 @@ app.post('/movimientoManual', (req, res) => {
 });
 
 
+// endpoint que regresa los movimientos de un miembro
+app.get('/movimientos/:id_miembro', (req, res) => {
+    const { id_miembro } = req.params; // Obtiene el id_miembro de los parámetros de la ruta
+
+    // Query para seleccionar todos los movimientos del miembro especificado
+    const selectMovimientosQuery = `
+        SELECT * FROM Movimientos
+        WHERE id_miembro = ?`;
+
+    pool.query(selectMovimientosQuery, [id_miembro], (err, movimientos) => {
+        if (err) {
+            console.error('Error retrieving movimientos:', err);
+            return res.status(500).send('Error al recuperar los movimientos');
+        }
+
+        // Si no hay errores, enviar los movimientos encontrados
+        res.json(movimientos);
+    });
+});
+
+
+
 
 
 
