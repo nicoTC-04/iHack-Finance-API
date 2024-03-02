@@ -5,7 +5,7 @@ const fs = require('fs');
 const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
-
+const { Configuration, OpenAIApi } = require("openai");
 
 
 const app = express();
@@ -34,8 +34,6 @@ const pool = mysql.createPool({
         throw err;
     }
   });
-
-
 
 
 //const pdfFilePath = '../iHack-Finance-API/tempFile/marzo 2024.pdf';
@@ -100,8 +98,64 @@ app.post('/checkUser', (req, res) => {
   });
 
 
+
+
+
+
+const obtenerResumen = async (miembroId) => {
+    const apiKey = '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';
+    const configuration = new Configuration({
+        apiKey: apiKey,
+    });
+    const openai = new OpenAIApi(configuration);
+
+    // Primer paso: Obtener los datos de la base de datos
+    const query = `SELECT total_gastos, total_ingresos, datos FROM Reporte WHERE id_miembro = ? AND fecha BETWEEN ? AND ?`;
+    const currentDate = new Date();
+    const firstDayCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const lastDayCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+
+    try {
+        const [rows] = await pool.query(query, [miembroId, firstDayCurrentMonth, lastDayCurrentMonth]);
+        if (rows.length === 0) {
+            throw new Error('No se encontraron reportes para este miembro y periodo');
+        }
+        const reporte = rows[0];
+
+        // Segundo paso: Enviar los datos a OpenAI para generar el resumen
+        const prompt = `
+        Quiero que me digas en una oracion recomendaciones sobre como usar mejor el dinero a partir de estos datos mensuales.
+
+        gastos mensuales: ${reporte.total_gastos}
+
+        ingresos mensuales: ${reporte.total_ingresos}
+
+        division de gastos por tipos: ${reporte.datos}
+        `;
+
+        const response = await openai.createCompletion({
+            model: "gpt-3.5-turbo", // Asegúrate de usar el modelo adecuado
+            prompt: prompt,
+            temperature: 0.4,
+            max_tokens: 256,
+            top_p: 1.0,
+            frequency_penalty: 0.0,
+            presence_penalty: 0.0,
+        });
+
+        return response.data.choices[0].text.trim();
+    } catch (error) {
+        console.error('Error en obtener Resumen De OpenAI Con DatosDB:', error);
+        throw error; // Re-lanzar el error para manejarlo en la función llamadora
+    }
+};
+
+
+
+
+
 // Endpoint to receive email and return information
-app.get('/reportesMiembro', (req, res) => {
+app.get('/reportesMiembro', async (req, res) => {
     const miembroId = req.header('id_miembro');
     console.log("miembroId en reportes");
     console.log(miembroId);
@@ -110,37 +164,48 @@ app.get('/reportesMiembro', (req, res) => {
         return res.status(400).json({ error: 'El id_miembro es requerido' });
     }
 
-    // Obtener el primer y último día del mes actual y el mes anterior
     const currentDate = new Date();
     const firstDayCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const lastDayPreviousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
-    const firstDayPreviousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    const lastDayCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
 
-    const query = `
-        SELECT r.total_gastos, r.total_ingresos, r.resumen, r.datos 
-        FROM Reporte r
-        WHERE r.id_miembro = ? AND (
-            (r.fecha >= ? AND r.fecha <= ?) OR 
-            (r.fecha >= ? AND r.fecha <= ?)
-        )`;
+    try {
+        // Suponiendo que esta función realiza una llamada a la API de OpenAI y devuelve un resumen
+        const nuevoResumen = await obtenerResumen(miembroId);
 
-    pool.getConnection((err, connection) => {
-        if (err) {
-            console.error('Error getting connection from pool:', err);
-            return res.status(500).send('Internal Server Error');
-        }
+        // Actualizar el resumen en el reporte del mes actual
+        const updateResumenQuery = `
+            UPDATE Reporte
+            SET resumen = ?
+            WHERE id_miembro = ? AND fecha >= ? AND fecha <= ?`;
 
-        connection.query(query, [miembroId, firstDayPreviousMonth, lastDayPreviousMonth, firstDayCurrentMonth, currentDate], (err, results) => {
-            connection.release();
-
+        pool.query(updateResumenQuery, [nuevoResumen, miembroId, firstDayCurrentMonth, lastDayCurrentMonth], (err, updateResult) => {
             if (err) {
-                console.error('Error performing query:', err);
-                return res.status(500).send('Internal Server Error');
+                console.error('Error updating resumen:', err);
+                return res.status(500).send('Error al actualizar el resumen');
             }
 
-            res.json(results);
+            // Continuar con la consulta original
+            const query = `
+                SELECT r.total_gastos, r.total_ingresos, r.resumen, r.datos 
+                FROM Reporte r
+                WHERE r.id_miembro = ? AND (
+                    (r.fecha >= ? AND r.fecha <= ?) OR 
+                    (r.fecha >= ? AND r.fecha <= ?)
+                )`;
+
+            pool.query(query, [miembroId, firstDayCurrentMonth, lastDayCurrentMonth, firstDayCurrentMonth, currentDate], (err, results) => {
+                if (err) {
+                    console.error('Error performing query:', err);
+                    return res.status(500).send('Internal Server Error');
+                }
+
+                res.json(results);
+            });
         });
-    });
+    } catch (error) {
+        console.error('Error obtaining or updating resumen:', error);
+        return res.status(500).send('Internal Server Error');
+    }
 });
 
 
@@ -227,6 +292,7 @@ app.post('/movimientoManual', (req, res) => {
         });
     });
 });
+
 
 
 // endpoint que regresa los movimientos de un miembro
