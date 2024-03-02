@@ -1,9 +1,11 @@
-import express from 'express';
-import mysql from 'mysql2';
-import pdf from 'pdf-parse';
-import fs from 'fs';
-import axios from 'axios';
-import cors from 'cors';
+const express = require('express');
+const mysql = require('mysql2');
+const pdf = require('pdf-parse');
+const fs = require('fs');
+const axios = require('axios');
+const cors = require('cors');
+const path = require('path');
+
 
 
 const app = express();
@@ -36,7 +38,7 @@ const pool = mysql.createPool({
 
 
 
-const pdfFilePath = '../iHack-Finance-API/tempFile/marzo 2024.pdf';
+//const pdfFilePath = '../iHack-Finance-API/tempFile/marzo 2024.pdf';
 const port = 3000;
 
 
@@ -121,7 +123,7 @@ app.post('/checkUser', (req, res) => {
 
 
 
-
+/*
 function readAndPrintPdfText(pdfFilePath) {
     // Reading the PDF file
     let dataBuffer = fs.readFileSync(pdfFilePath);
@@ -137,8 +139,8 @@ function readAndPrintPdfText(pdfFilePath) {
 }
 
 
-//readAndPrintPdfText(pdfFilePath);
-
+readAndPrintPdfText(pdfFilePath);
+*/
 
 
 app.listen(port, () => {
