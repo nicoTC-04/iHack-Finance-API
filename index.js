@@ -1,10 +1,9 @@
-const express = require('express');
-const pdf = require('pdf-parse');
-const fs = require('fs');
-const mysql = require('mysql2');
-const axios = require('axios');
-const cors = require('cors');
-const OpenAI = require('openai');
+import express from 'express';
+import mysql from 'mysql2';
+import pdf from 'pdf-parse';
+import fs from 'fs';
+import axios from 'axios';
+import cors from 'cors';
 
 
 const app = express();
