@@ -51,20 +51,6 @@ app.get('/', (req, res) => {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Endpoint to receive email and return information
 app.post('/checkUser', (req, res) => {
     const { email } = req.body;
@@ -112,6 +98,53 @@ app.post('/checkUser', (req, res) => {
         });
     });
   });
+
+
+
+
+// Endpoint to receive email and return information
+app.get('/reportesMiembro', (req, res) => {
+    const miembroId = req.header('id_miembro');
+    console.log("miembroId en reportes");
+    console.log(miembroId);
+
+    if (!miembroId) {
+        return res.status(400).json({ error: 'El id_miembro es requerido' });
+    }
+
+    // Obtener el primer y último día del mes actual y el mes anterior
+    const currentDate = new Date();
+    const firstDayCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const lastDayPreviousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
+    const firstDayPreviousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+
+    const query = `
+        SELECT r.total_gastos, r.total_ingresos, r.resumen, r.datos 
+        FROM Reporte r
+        WHERE r.id_miembro = ? AND (
+            (r.fecha >= ? AND r.fecha <= ?) OR 
+            (r.fecha >= ? AND r.fecha <= ?)
+        )`;
+
+    pool.getConnection((err, connection) => {
+        if (err) {
+            console.error('Error getting connection from pool:', err);
+            return res.status(500).send('Internal Server Error');
+        }
+
+        connection.query(query, [id_miembro, firstDayPreviousMonth, lastDayPreviousMonth, firstDayCurrentMonth, currentDate], (err, results) => {
+            connection.release();
+
+            if (err) {
+                console.error('Error performing query:', err);
+                return res.status(500).send('Internal Server Error');
+            }
+
+            res.json(results);
+        });
+    });
+});
+
 
 
 
