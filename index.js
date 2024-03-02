@@ -100,8 +100,6 @@ app.post('/checkUser', (req, res) => {
   });
 
 
-
-
 // Endpoint to receive email and return information
 app.get('/reportesMiembro', (req, res) => {
     const miembroId = req.header('id_miembro');
@@ -132,7 +130,7 @@ app.get('/reportesMiembro', (req, res) => {
             return res.status(500).send('Internal Server Error');
         }
 
-        connection.query(query, [id_miembro, firstDayPreviousMonth, lastDayPreviousMonth, firstDayCurrentMonth, currentDate], (err, results) => {
+        connection.query(query, [miembroId, firstDayPreviousMonth, lastDayPreviousMonth, firstDayCurrentMonth, currentDate], (err, results) => {
             connection.release();
 
             if (err) {
@@ -146,6 +144,89 @@ app.get('/reportesMiembro', (req, res) => {
 });
 
 
+
+// endpoint que agrega un movimientoManual
+app.post('/movimientoManual', (req, res) => {
+    const { id_miembro, gasto, cantidad, nombre_lugar, tipo, fechaMovimiento } = req.body;
+    const fecha = fechaMovimiento ? new Date(fechaMovimiento) : new Date();
+    const fechaReporte = new Date(fecha.getFullYear(), fecha.getMonth(), 1);
+
+    const insertMovimientoQuery = `
+        INSERT INTO Movimientos (id_miembro, fecha, gasto, cantidad, nombre_lugar, tipo)
+        VALUES (?, ?, ?, ?, ?, ?)`;
+
+    pool.query(insertMovimientoQuery, [id_miembro, fecha, gasto, cantidad, nombre_lugar, tipo], (err, movimientoResult) => {
+        if (err) {
+            console.error('Error inserting movimiento:', err);
+            return res.status(500).send('Error al insertar movimiento');
+        }
+
+        const checkReporteQuery = `
+            SELECT * FROM Reporte
+            WHERE id_miembro = ? AND MONTH(fecha) = ? AND YEAR(fecha) = ?`;
+
+        pool.query(checkReporteQuery, [id_miembro, fechaReporte.getMonth() + 1, fechaReporte.getFullYear()], (err, reportes) => {
+            if (err) {
+                console.error('Error checking reporte:', err);
+                return res.status(500).send('Error al chequear reporte');
+            }
+
+            if (reportes.length > 0) {
+                const reporte = reportes[0];
+
+                let datosActualizados = reporte.datos ? JSON.parse(reporte.datos) : {};
+                if (gasto == true) {
+                    datosActualizados[tipo] = (datosActualizados[tipo] || 0) + cantidad;
+                }
+
+                const updateReporteQuery = `
+                    UPDATE Reporte
+                    SET total_gastos = IF(? = TRUE, total_gastos + ?, total_gastos), 
+                        total_ingresos = IF(? = FALSE, total_ingresos + ?, total_ingresos),
+                        resumen = IFNULL(resumen, ''), 
+                        datos = ?
+                    WHERE id_reporte = ?`;
+
+                pool.query(updateReporteQuery, [gasto, cantidad, gasto, cantidad, JSON.stringify(datosActualizados), reporte.id_reporte], (err, updateResult) => {
+                    if (err) {
+                        console.error('Error updating reporte:', err);
+                        return res.status(500).send('Error al actualizar reporte');
+                    }
+
+                    res.send('Movimiento y reporte actualizados correctamente');
+                });
+            } else {
+                const totalGastos = gasto ? cantidad : 0;
+                const totalIngresos = !gasto ? cantidad : 0;
+
+                const datosIniciales = {
+                    Entretenimiento: 0,
+                    Transporte: 0,
+                    Varios: 0,
+                    Basicos: 0,
+                    Restaurante: 0
+                };
+
+                if (gasto) {
+                    datosIniciales[tipo] = cantidad;
+                }
+
+                const insertReporteQuery = `
+                    INSERT INTO Reporte (id_miembro, fecha, total_gastos, total_ingresos, resumen, datos)
+                    VALUES (?, ?, ?, ?, ?, ?)`;
+
+                pool.query(insertReporteQuery, [id_miembro, fechaReporte, totalGastos, totalIngresos, "", JSON.stringify(datosIniciales)], (err, insertResult) => {
+                    if (err) {
+                        console.error('Error inserting new reporte:', err);
+                        return res.status(500).send('Error al insertar nuevo reporte');
+                    }
+
+                    res.send('Movimiento añadido y nuevo reporte creado');
+                });
+            }
+        });
+    });
+});
 
 
 
