@@ -147,7 +147,7 @@ const obtenerResumen = async (miembroId) => {
 
     try {
         const response = await openai.createChatCompletion({
-            engine: 'gpt-3.5-turbo',
+            model: 'gpt-3.5-turbo',
             messages: [
                 {
                   role: "system",
@@ -160,7 +160,8 @@ const obtenerResumen = async (miembroId) => {
               ],
         });
 
-        return response.data.choices[0].message.content;
+        console.log(response.choices[0].message.content);
+        return response.choices[0].message.content;
     } catch (error) {
         console.error('Error al obtener el resumen de OpenAI:', error);
         throw error;
@@ -185,6 +186,9 @@ app.get('/reportesMiembro', async (req, res) => {
     const firstDayCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     const lastDayCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
 
+    const firstDayPreviousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    const lastDayPreviousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
+
     try {
         // Suponiendo que esta función realiza una llamada a la API de OpenAI y devuelve un resumen
         const nuevoResumen = await obtenerResumen(miembroId);
@@ -203,14 +207,14 @@ app.get('/reportesMiembro', async (req, res) => {
 
             // Continuar con la consulta original
             const query = `
-                SELECT r.total_gastos, r.total_ingresos, r.resumen, r.datos 
+                SELECT r.fecha, r.total_gastos, r.total_ingresos, r.resumen, r.datos 
                 FROM Reporte r
                 WHERE r.id_miembro = ? AND (
                     (r.fecha >= ? AND r.fecha <= ?) OR 
                     (r.fecha >= ? AND r.fecha <= ?)
                 )`;
 
-            pool.query(query, [miembroId, firstDayCurrentMonth, lastDayCurrentMonth, firstDayCurrentMonth, currentDate], (err, results) => {
+            pool.query(query, [miembroId, firstDayPreviousMonth, lastDayPreviousMonth, firstDayCurrentMonth, lastDayCurrentMonth], (err, results) => {
                 if (err) {
                     console.error('Error performing query:', err);
                     return res.status(500).send('Internal Server Error');
