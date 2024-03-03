@@ -106,17 +106,20 @@ app.post('/checkUser', (req, res) => {
 
 
 
-
 const obtenerResumen = async (miembroId) => {
+    const fechaActual = new Date();
+    const primerDiaDelMes = new Date(fechaActual.getFullYear(), fechaActual.getMonth(), 1);
+    const ultimoDiaDelMes = new Date(fechaActual.getFullYear(), fechaActual.getMonth() + 1, 0);
+
     // Primer paso: Obtener los datos de la base de datos
     const query = `SELECT total_gastos, total_ingresos, datos FROM Reporte WHERE id_miembro = ? AND fecha BETWEEN ? AND ?`;
     
-    let reporteData;
+    let reporte;
 
     try {
-        const [rows] = await pool.promise().query(query, [miembroId]);
+        const [rows] = await pool.promise().query(query, [miembroId, primerDiaDelMes, ultimoDiaDelMes]);
         if (rows.length > 0) {
-            reporteData = rows[0];
+            reporte = rows[0];
         } else {
             console.log('No se encontró el reporte para el miembro:', miembroId);
             return null;
