@@ -13,7 +13,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-const uploadsDirectory = 'tempFile/';
+const uploadsDirectory = '../iHack-Finance-API/tempFile/';
 
 // multer setup
 // Set up storage location and filenames for uploaded files
