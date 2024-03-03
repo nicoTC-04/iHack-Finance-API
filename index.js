@@ -201,8 +201,9 @@ app.get('/reportesMiembro', async (req, res) => {
     const firstDayCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     const lastDayCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
 
-    const firstDayPreviousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-    const lastDayPreviousMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
+    // Calcular las fechas para los últimos 4 meses
+    const firstDayThirdMonthAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 3, 1);
+    const lastDayFourthMonthAgo = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
 
     try {
         // Suponiendo que esta función realiza una llamada a la API de OpenAI y devuelve un resumen
@@ -220,16 +221,15 @@ app.get('/reportesMiembro', async (req, res) => {
                 return res.status(500).send('Error al actualizar el resumen');
             }
 
-            // Continuar con la consulta original
+            // Consulta actualizada para incluir los últimos 4 meses
             const query = `
                 SELECT r.fecha, r.total_gastos, r.total_ingresos, r.resumen, r.datos 
                 FROM Reporte r
                 WHERE r.id_miembro = ? AND (
-                    (r.fecha >= ? AND r.fecha <= ?) OR 
                     (r.fecha >= ? AND r.fecha <= ?)
                 )`;
 
-            pool.query(query, [miembroId, firstDayPreviousMonth, lastDayPreviousMonth, firstDayCurrentMonth, lastDayCurrentMonth], (err, results) => {
+            pool.query(query, [miembroId, firstDayThirdMonthAgo, lastDayCurrentMonth], (err, results) => {
                 if (err) {
                     console.error('Error performing query:', err);
                     return res.status(500).send('Internal Server Error');
@@ -243,6 +243,7 @@ app.get('/reportesMiembro', async (req, res) => {
         return res.status(500).send('Internal Server Error');
     }
 });
+
 
 
 
