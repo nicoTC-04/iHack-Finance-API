@@ -146,17 +146,21 @@ const obtenerResumen = async (miembroId) => {
     `;
 
     try {
-        const response = await openai.createCompletion({
-            engine: 'text-davinci-003',
-            prompt: prompt,
-            maxTokens: 256,
-            temperature: 0.4,
-            topP: 1.0,
-            frequencyPenalty: 0.0,
-            presencePenalty: 0.0,
+        const response = await openai.createChatCompletion({
+            engine: 'gpt-3.5-turbo',
+            messages: [
+                {
+                  role: "system",
+                  content: "You are a helpful assistant."
+                },
+                {
+                  role: "user",
+                  content: prompt
+                }
+              ],
         });
 
-        return response.data.choices[0].text.trim();
+        return response.data.choices[0].message.content;
     } catch (error) {
         console.error('Error al obtener el resumen de OpenAI:', error);
         throw error;
