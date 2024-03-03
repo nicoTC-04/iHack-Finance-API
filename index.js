@@ -147,7 +147,7 @@ const obtenerResumen = async (miembroId) => {
 
     try {
         const response = await openai.createCompletion({
-            engine: 'gpt-3.5-turbo',
+            engine: 'text-davinci-003',
             prompt: prompt,
             maxTokens: 256,
             temperature: 0.4,
