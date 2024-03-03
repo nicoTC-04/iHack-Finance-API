@@ -542,12 +542,12 @@ app.post('/movimientoPDF', upload.single('pdf'), async (req, res) => {
 
         for (const movimiento of movimientos) {
             // Separa los datos del movimiento
-            const [fecha, tipoMov, cantidad, nombreLugar, tipo] = movimiento.split('%%%');
+            const [fecha, tipoMov, cantidad, nombre_lugar, tipo] = movimiento.split('%%%');
             const gasto = tipoMov === 'gasto';
 
             // Aquí insertas cada movimiento en la base de datos
             await new Promise((resolve, reject) => {
-                insertarMovimiento({ id_miembro, fecha, gasto, cantidad, nombreLugar, tipo }, (err, result) => {
+                insertarMovimiento({ id_miembro, fecha, gasto, cantidad, nombre_lugar, tipo }, (err, result) => {
                     if (err) {
                         console.error('Error insertando movimiento:', err);
                         reject(err);
