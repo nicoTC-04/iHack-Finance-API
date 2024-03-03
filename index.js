@@ -5,7 +5,7 @@ const fs = require('fs');
 const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
-const { Configuration, OpenAIApi } = require("openai");
+const OpenAI = require("openai-api");
 
 
 const app = express();
@@ -34,6 +34,11 @@ const pool = mysql.createPool({
         throw err;
     }
   });
+
+
+const openai= new OpenAI({
+    apiKey:"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"
+});
 
 
 //const pdfFilePath = '../iHack-Finance-API/tempFile/marzo 2024.pdf';
@@ -103,50 +108,50 @@ app.post('/checkUser', (req, res) => {
 
 
 const obtenerResumen = async (miembroId) => {
-    const apiKey = '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';
-    const configuration = new Configuration({
-        apiKey: apiKey,
-    });
-    const openai = new OpenAIApi(configuration);
-
     // Primer paso: Obtener los datos de la base de datos
     const query = `SELECT total_gastos, total_ingresos, datos FROM Reporte WHERE id_miembro = ? AND fecha BETWEEN ? AND ?`;
-    const currentDate = new Date();
-    const firstDayCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const lastDayCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    
+    let reporteData;
 
     try {
-        const [rows] = await pool.query(query, [miembroId, firstDayCurrentMonth, lastDayCurrentMonth]);
-        if (rows.length === 0) {
-            throw new Error('No se encontraron reportes para este miembro y periodo');
+        const [rows] = await pool.promise().query(query, [miembroId]);
+        if (rows.length > 0) {
+            reporteData = rows[0];
+        } else {
+            console.log('No se encontró el reporte para el miembro:', miembroId);
+            return null;
         }
-        const reporte = rows[0];
+    } catch (err) {
+        console.error('Error al consultar la base de datos:', err);
+        throw err;
+    }
 
-        // Segundo paso: Enviar los datos a OpenAI para generar el resumen
-        const prompt = `
-        Quiero que me digas en una oracion recomendaciones sobre como usar mejor el dinero a partir de estos datos mensuales.
+    // Preparar el prompt con los datos del reporte
+    const prompt = `
+    Quiero que me digas en una oracion recomendaciones sobre como usar mejor el dinero a partir de estos datos mensuales.
+  
+    gastos mensuales: ${reporte.total_gastos}
+  
+    ingresos mensuales: ${reporte.total_ingresos}
+  
+    division de gastos por tipos: ${reporte.datos}
+    `;
 
-        gastos mensuales: ${reporte.total_gastos}
-
-        ingresos mensuales: ${reporte.total_ingresos}
-
-        division de gastos por tipos: ${reporte.datos}
-        `;
-
-        const response = await openai.createCompletion({
-            model: "gpt-3.5-turbo", // Asegúrate de usar el modelo adecuado
+    try {
+        const response = await openai.complete({
+            engine: 'gpt-3.5-turbo',
             prompt: prompt,
+            maxTokens: 256,
             temperature: 0.4,
-            max_tokens: 256,
-            top_p: 1.0,
-            frequency_penalty: 0.0,
-            presence_penalty: 0.0,
+            topP: 1.0,
+            frequencyPenalty: 0.0,
+            presencePenalty: 0.0,
         });
 
         return response.data.choices[0].text.trim();
     } catch (error) {
-        console.error('Error en obtener Resumen De OpenAI Con DatosDB:', error);
-        throw error; // Re-lanzar el error para manejarlo en la función llamadora
+        console.error('Error al obtener el resumen de OpenAI:', error);
+        throw error;
     }
 };
 
