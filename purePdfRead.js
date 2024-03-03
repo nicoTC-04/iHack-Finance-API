@@ -1,20 +1,9 @@
 const pdf = require('pdf-parse');
-const PDFParser = require("pdf2json");
 const fs = require('fs');
 
-const pdfFilePath = '../iHack-Finance-API/tempFile/agosto2023.pdf';
-
-const pdfParser = new PDFParser();
-
-pdfParser.on("pdfParser_dataError", errData => console.error(errData.parserError));
-pdfParser.on("pdfParser_dataReady", pdfData => {
-    console.log(JSON.stringify(pdfData, null, 2)); // Pretty print the JSON
-});
-
-pdfParser.loadPDF(pdfFilePath);
+const pdfFilePath = '../iHack-Finance-API/tempFile/marzo 2024.pdf';
 
 
-/*
 function readAndPrintPdfText(pdfFilePath) {
     // Reading the PDF file
     let dataBuffer = fs.readFileSync(pdfFilePath);
@@ -30,4 +19,3 @@ function readAndPrintPdfText(pdfFilePath) {
 }
 
 readAndPrintPdfText(pdfFilePath);
-*/

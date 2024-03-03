@@ -6,12 +6,28 @@ const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
 const { OpenAI } = require("openai");
-
+const multer = require('multer');
 
 
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+const uploadsDirectory = 'tempFile/';
+
+// multer setup
+// Set up storage location and filenames for uploaded files
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, uploadsDirectory); // Ensure this directory exists
+    },
+    filename: function (req, file, cb) {
+      // Use a fixed file name
+      cb(null, 'cuenta.pdf');
+    }
+  });
+  
+const upload = multer({ storage: storage });
 
 
 // Configuracion DB
@@ -55,7 +71,6 @@ const port = 3000;
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
-
 
 
 
@@ -146,7 +161,7 @@ const obtenerResumen = async (miembroId) => {
     `;
 
     try {
-        const response = await openai.createChatCompletion({
+        const response = await openai.chat.completions.create({
             model: 'gpt-3.5-turbo',
             messages: [
                 {
@@ -315,7 +330,6 @@ app.post('/movimientoManual', (req, res) => {
 });
 
 
-
 // endpoint que regresa los movimientos de un miembro
 app.get('/movimientos/:id_miembro', (req, res) => {
     const { id_miembro } = req.params; // Obtiene el id_miembro de los parámetros de la ruta
@@ -339,31 +353,222 @@ app.get('/movimientos/:id_miembro', (req, res) => {
 
 
 
+// Function to clear the uploads directory
+function clearUploadsDirectory() {
+    fs.readdir(uploadsDirectory, (err, files) => {
+      if (err) throw err;
+  
+      for (const file of files) {
+        fs.unlink(`${uploadsDirectory}${file}`, err => {
+          if (err) throw err;
+        });
+      }
+    });
+  }
 
 
-
-
-
-
-
-/*
-function readAndPrintPdfText(pdfFilePath) {
-    // Reading the PDF file
-    let dataBuffer = fs.readFileSync(pdfFilePath);
-
-    // Using pdf-parse to extract text from the PDF
-    pdf(dataBuffer).then(function(data) {
-        // Printing the text content to the console
-        console.log(data.text);
-    }).catch(function(error){
-        // Handling any errors
-        console.error("Error parsing PDF: ", error);
+function readPdf(pdfFilePath) {
+    return new Promise((resolve, reject) => {
+        let dataBuffer = fs.readFileSync(pdfFilePath);
+        pdf(dataBuffer).then(data => {
+            resolve(data.text);
+        }).catch(error => {
+            reject(error);
+        });
     });
 }
 
 
-readAndPrintPdfText(pdfFilePath);
-*/
+const obtenerMovimientosGPT = async (textoPDF) => {
+    // Preparar el prompt con los datos del reporte
+    const systemMessage = "Eres un contador financiero que registra los gastos e ingresos a partir de un estado de cuentas"
+
+
+    const prompt = `
+    Te voy a dar la conversion de pdf a texto de un estado de cuenta de una tarjeta de credito NU. quiero que para cada gasto o ingreso (pago de la tarjeta) mostrado en la cuenta me regreses ciertos valores en el siguiente formato. (no agregues el formato en tu respuesta):
+
+    fecha (formato DD-MM-YYYY)%%%gasto/ingreso (escribir si se hizo un gasto o pago a la tarjeta si se hizo un pago escribe ingreso y si se hizo un gasto escribe gasto)%%%cantidad (solamente el numero sin comas pero si decimal)%%%nombre (no del usuario si no de la cuenta a la que se hizo el movimiento)%%%tipo
+
+
+    SOLAMENTE HAY UNA CIERTA CANTIDAD DE TIPOS QUE PUEDES PONER ESOS SON:
+
+    - Entretenimiento (videojuegos, subscripciones de cosas de ocio como steam o epic games)
+    - Transporte (uber, gasolina, oxxo gas, etc.)
+    - Varios (Ropa, accesorios, amazon, moneypool, transferencias, oxxo, o comercio electronico T, Office Depot)
+    - Basicos (Cosas basicas para vivir, servicios de agua, Supermercado, luz, gas, etc.)
+    - Restaurante (gastos en restaurantes como carls jr, r Trompo o dominos especialmente en Mr Trompo)
+
+    Mr Trompo es restaurante y Comercio Electronico T de varios
+    NO PUEDES AGREGAR MAS TIPOS DE LOS MENCIONADOS AQUI ARRIBA, SI ALGUNO NO SABES DONDE VA PONLO EN Varios
+
+    Estado de cuenta:
+    [
+    ${textoPDF}
+    ]
+    `;
+
+    try {
+        const response = await openai.chat.completions.create({
+            model: 'gpt-3.5-turbo',
+            messages: [
+                {
+                  role: "system",
+                  content: systemMessage
+                },
+                {
+                  role: "user",
+                  content: prompt
+                }
+              ],
+            temperature: 0.2,
+            max_tokens: 4096,
+        });
+
+        console.log(response.choices[0].message.content);
+        return response.choices[0].message.content;
+    } catch (error) {
+        console.error('Error al obtener el resumen de OpenAI:', error);
+        throw error;
+    }
+};
+
+
+
+async function insertarMovimiento({ id_miembro, fecha, gasto, cantidad, nombre_lugar, tipo }) {
+
+    const fechaMovimiento = new Date(fecha.split('-').reverse().join('-'));
+    const fechaReporte = new Date(fechaMovimiento.getFullYear(), fechaMovimiento.getMonth(), 1);
+
+    const insertMovimientoQuery = `
+        INSERT INTO Movimientos (id_miembro, fecha, gasto, cantidad, nombre_lugar, tipo)
+        VALUES (?, ?, ?, ?, ?, ?)`;
+
+    pool.query(insertMovimientoQuery, [id_miembro, fechaMovimiento, gasto, cantidad, nombre_lugar, tipo], (err, movimientoResult) => {
+        if (err) {
+            console.error('Error inserting movimiento:', err);
+            return callback(err, null);
+        }
+
+        const checkReporteQuery = `
+            SELECT * FROM Reporte
+            WHERE id_miembro = ? AND MONTH(fecha) = ? AND YEAR(fecha) = ?`;
+
+        pool.query(checkReporteQuery, [id_miembro, fechaReporte.getMonth() + 1, fechaReporte.getFullYear()], (err, reportes) => {
+            if (err) {
+                console.error('Error chequeando reporte:', err);
+                return callback(err, null);
+            }
+
+            if (reportes.length > 0) {
+                const reporte = reportes[0];
+
+                let datosActualizados = reporte.datos ? JSON.parse(reporte.datos) : {};
+                if (gasto == true) {
+                    datosActualizados[tipo] = (datosActualizados[tipo] || 0) + cantidad;
+                }
+
+                const updateReporteQuery = `
+                    UPDATE Reporte
+                    SET total_gastos = IF(? = TRUE, total_gastos + ?, total_gastos), 
+                        total_ingresos = IF(? = FALSE, total_ingresos + ?, total_ingresos),
+                        resumen = IFNULL(resumen, ''), 
+                        datos = ?
+                    WHERE id_reporte = ?`;
+
+                pool.query(updateReporteQuery, [gasto, cantidad, gasto, cantidad, JSON.stringify(datosActualizados), reporte.id_reporte], (err, updateResult) => {
+                    if (err) {
+                        console.error('Error updating reporte:', err);
+                        return callback(err, null);
+                    }
+                });
+
+                callback(null, 'Movimiento y reporte actualizados correctamente');
+            } else {
+                const totalGastos = gasto ? cantidad : 0;
+                const totalIngresos = !gasto ? cantidad : 0;
+
+                const datosIniciales = {
+                    Entretenimiento: 0,
+                    Transporte: 0,
+                    Varios: 0,
+                    Basicos: 0,
+                    Restaurante: 0
+                };
+
+                if (gasto) {
+                    datosIniciales[tipo] = cantidad;
+                }
+
+                const insertReporteQuery = `
+                    INSERT INTO Reporte (id_miembro, fecha, total_gastos, total_ingresos, resumen, datos)
+                    VALUES (?, ?, ?, ?, ?, ?)`;
+
+                pool.query(insertReporteQuery, [id_miembro, fechaReporte, totalGastos, totalIngresos, "", JSON.stringify(datosIniciales)], (err, insertResult) => {
+                    if (err) {
+                        console.error('Error al insertar nuevo reporte ', err);
+                        return callback(err, null);
+                    }
+
+                    callback(null, 'Movimiento añadido y nuevo reporte creado');
+                });
+            }
+        });
+    });
+}
+
+
+
+app.post('/movimientoPDF', upload.single('pdf'), async (req, res) => {
+    console.log(req.file); // Uploaded file details
+    // Optionally process the file here
+    const pdfFilePath = `${uploadsDirectory}cuenta.pdf`;
+
+    const { id_miembro } = req.body; // Extrae id_miembro del cuerpo de la solicitud
+
+    // Verifica si el id_miembro está presente
+    if (!id_miembro) {
+        return res.status(400).send('El id_miembro es requerido.');
+    }
+
+    try {
+        const pdfText = await readPdf(pdfFilePath);
+        //console.log(pdfText); // Optionally do something with the text
+
+        // Suponiendo que esta función realiza una llamada a la API de OpenAI y devuelve un resumen
+        const datos = await obtenerMovimientosGPT(pdfText);
+
+        // Parsea los datos para obtener cada línea como un movimiento
+        const movimientos = datos.split('\n').filter(line => line.trim() !== ''); // Asegura que no hay líneas vacías
+
+        for (const movimiento of movimientos) {
+            // Separa los datos del movimiento
+            const [fecha, tipoMov, cantidad, nombreLugar, tipo] = movimiento.split('%%%');
+            const gasto = tipoMov === 'gasto';
+
+            // Aquí insertas cada movimiento en la base de datos
+            await new Promise((resolve, reject) => {
+                insertarMovimiento({ id_miembro, fecha, gasto, cantidad, nombreLugar, tipo }, (err, result) => {
+                    if (err) {
+                        console.error('Error insertando movimiento:', err);
+                        reject(err);
+                    } else {
+                        console.log(result);
+                        resolve(result);
+                    }
+                });
+            });
+        }
+
+        // Clear the directory after processing
+        clearUploadsDirectory();
+
+        res.send('PDF file uploaded and directory cleared successfully!');
+    } catch (error) {
+        console.error("Error processing PDF: ", error);
+        res.status(500).send("Error processing PDF");
+    }
+});
+
 
 
 app.listen(port, () => {
