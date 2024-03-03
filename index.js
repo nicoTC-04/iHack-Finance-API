@@ -434,7 +434,7 @@ const obtenerMovimientosGPT = async (textoPDF) => {
 
 
 
-async function insertarMovimiento({ id_miembro, fecha, gasto, cantidad, nombre_lugar, tipo }) {
+function insertarMovimiento({ id_miembro, fecha, gasto, cantidad, nombre_lugar, tipo }, callback) {
 
     const fechaMovimiento = new Date(fecha.split('-').reverse().join('-'));
     const fechaReporte = new Date(fechaMovimiento.getFullYear(), fechaMovimiento.getMonth(), 1);
