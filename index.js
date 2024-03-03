@@ -5,7 +5,7 @@ const fs = require('fs');
 const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
-const { Configuration, OpenAIApi } = require("openai");
+const { OpenAI } = require("openai");
 
 
 
@@ -40,11 +40,9 @@ const apiKeyPart1 = 'sk-lwCzXtZep0PQLwOPcsQxT3B';
 const apiKeyPart2 = 'lbkFJb41wy6oMhnZQicxcxnBd';
 const apiKey = apiKeyPart1 + apiKeyPart2;
 
-const configuration = new Configuration({
+const openai = new OpenAI({
     apiKey: apiKey,
 });
-
-const openai = new OpenAIApi(configuration);
 
 
 
