@@ -389,10 +389,6 @@ const obtenerMovimientosGPT = async (textoPDF) => {
 
     fecha (formato DD-MM-YYYY)%%%gasto/ingreso (escribir si se hizo un gasto o pago a la tarjeta si se hizo un pago escribe ingreso y si se hizo un gasto escribe gasto)%%%cantidad (solamente el numero sin comas pero si decimal)%%%nombre (no del usuario si no de la cuenta a la que se hizo el movimiento)%%%tipo
 
-    NO PUEDES CAMBIAR EL ORDEN DEL FORMATO PASE LO QUE PASE
-    El orden debe ser fecha%%%gasto/ingreso%%%cantidad%%%nombre%%%tipo
-
-
     SOLAMENTE HAY UNA CIERTA CANTIDAD DE TIPOS QUE PUEDES PONER ESOS SON:
 
     - Entretenimiento (videojuegos, subscripciones de cosas de ocio como steam o epic games)
@@ -403,6 +399,10 @@ const obtenerMovimientosGPT = async (textoPDF) => {
 
     Mr Trompo es restaurante y Comercio Electronico T de varios
     NO PUEDES AGREGAR MAS TIPOS DE LOS MENCIONADOS AQUI ARRIBA, SI ALGUNO NO SABES DONDE VA PONLO EN Varios
+
+
+    NO PUEDES CAMBIAR EL ORDEN DEL FORMATO PASE LO QUE PASE
+    El orden debe ser fecha%%%gasto/ingreso%%%cantidad%%%nombre%%%tipo
 
     Estado de cuenta:
     [
