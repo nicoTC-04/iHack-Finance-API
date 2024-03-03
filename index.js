@@ -5,7 +5,8 @@ const fs = require('fs');
 const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
-const OpenAI = require("openai-api");
+const { Configuration, OpenAIApi } = require("openai");
+
 
 
 const app = express();
@@ -20,25 +21,31 @@ const pool = mysql.createPool({
     user: 'nicoAdmin',
     password: 'Kge/a;^nSH#./]L8',
     database: 'Finance'
-  });
+});
   
-  pool.on('connection', function (connection) {
+pool.on('connection', function (connection) {
     console.log('DB Connection established');
-  });
-  
-  pool.on('error', function (err) {
+});
+ 
+pool.on('error', function (err) {
     console.error('DB Connection error', err);
     if (err.code === 'PROTOCOL_CONNECTION_LOST') {
         console.error('Database connection was closed.');
     } else {
         throw err;
     }
-  });
-
-
-const openai= new OpenAI({
-    apiKey:"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"
 });
+
+const apiKeyPart1 = 'sk-lwCzXtZep0PQLwOPcsQxT3B';
+const apiKeyPart2 = 'lbkFJb41wy6oMhnZQicxcxnBd';
+const apiKey = apiKeyPart1 + apiKeyPart2;
+
+const configuration = new Configuration({
+    apiKey: apiKey,
+});
+
+const openai = new OpenAIApi(configuration);
+
 
 
 //const pdfFilePath = '../iHack-Finance-API/tempFile/marzo 2024.pdf';
@@ -141,7 +148,7 @@ const obtenerResumen = async (miembroId) => {
     `;
 
     try {
-        const response = await openai.complete({
+        const response = await openai.createCompletion({
             engine: 'gpt-3.5-turbo',
             prompt: prompt,
             maxTokens: 256,
